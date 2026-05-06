@@ -1,6 +1,6 @@
 # Recipe Building Blocks and Configurations
 
-###Some Suggestions
+### Some Suggestions
 Based on My Experience with the CO-Creator
 *   **Try to complete the work related to SmartAI block in one-shot** - On publishing a recipe all your chat with SmartAI block will get reset.
 *   **Use JSON Object with all the connection and parameter to get a complete flow in oneshot** - Use Other LLM for getting json object and then paste that into Co-creator
