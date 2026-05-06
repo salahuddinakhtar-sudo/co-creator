@@ -62,6 +62,167 @@ End the conversation.
 *   **Required:** `message` (closing message)
 *   **Use when:** The flow is complete and should terminate.
 
+```bash
+{
+  "name": "Advanced Voice Support Flow",
+  "blocks": [
+    {
+      "id": "start-1",
+      "type": "start",
+      "label": "Start",
+      "isStart": true
+    },
+    {
+      "id": "msg-1",
+      "type": "message",
+      "label": "Welcome Message",
+      "text": "Welcome to Global Finance Support.",
+      "next_block": "ask-1"
+    },
+    {
+      "id": "ask-1",
+      "type": "ask",
+      "label": "Initial Intent Triage",
+      "question": "Are you calling about an existing account, or are you interested in our new loan products?",
+      "max_attempts": 3,
+      "enable_conversation_history": false,
+      "intents": [
+        {
+          "intent_name": "account_query",
+          "next_block": "api-1",
+          "variables_to_capture": ["account_number"]
+        },
+        {
+          "intent_name": "loan_query",
+          "next_block": "ai-1"
+        }
+      ],
+      "failover_block": "transfer-1"
+    },
+    {
+      "id": "api-1",
+      "type": "api",
+      "label": "Fetch Account Status",
+      "http_method": "GET",
+      "url": "https://api.globalfinance.com/v1/accounts/{{account_number}}",
+      "http_timeout": 10,
+      "no_of_retries": 1,
+      "next_block": "code-1",
+      "fail_block": "transfer-1"
+    },
+    {
+      "id": "code-1",
+      "type": "code",
+      "label": "Parse API Response",
+      "code": "function main(context, variables, plugins) { const status = variables['api-1'].response.body.account_status; plugins.SetRecipeVariables('parsed_status', status); return status; }",
+      "result_variable_type": "TEXT",
+      "selected_plugins": [],
+      "next_block": "cond-1",
+      "fail_block": "transfer-1"
+    },
+    {
+      "id": "cond-1",
+      "type": "condition",
+      "label": "Check Account Standing",
+      "cases": [
+        {
+          "conditions": [
+            {
+              "lhs": "{{parsed_status}}",
+              "operator": "=",
+              "rhs": "ACTIVE"
+            }
+          ],
+          "logical_operator": "AND",
+          "next_block": "msg-2"
+        }
+      ],
+      "default_next_block": "transfer-1"
+    },
+    {
+      "id": "msg-2",
+      "type": "message",
+      "label": "Account Active Notification",
+      "text": "Your account is active. An SMS with your balance has been sent.",
+      "next_block": "close-1"
+    },
+    {
+      "id": "ai-1",
+      "type": "smart_ai",
+      "label": "Loan Assistant LLM",
+      "llm_prompt": "You are a helpful loan specialist. Ask the user if they want a Personal Loan or an Auto Loan, and extract their requested amount.",
+      "persona": "Professional and concise financial advisor.",
+      "max_attempts": 3,
+      "allow_barge_in": true,
+      "intents": [
+        {
+          "intent_name": "personal_loan",
+          "next_block": "msg-3",
+          "variables_to_capture": ["loan_amount"]
+        },
+        {
+          "intent_name": "auto_loan",
+          "next_block": "msg-3",
+          "variables_to_capture": ["loan_amount"]
+        }
+      ],
+      "failover_block": "transfer-1"
+    },
+    {
+      "id": "msg-3",
+      "type": "message",
+      "label": "Loan Acknowledgment",
+      "text": "Thank you. A loan officer will review your request for {{loan_amount}}.",
+      "next_block": "close-1"
+    },
+    {
+      "id": "transfer-1",
+      "type": "transfer",
+      "label": "Agent Handoff",
+      "reason": "I am transferring you to a live agent for further assistance.",
+      "when_to_transfer": "AVAILABLE",
+      "action_when_no_agent_online": {
+        "type": "MOVE_TO_NEXT_BLOCK",
+        "next_block": "close-1"
+      }
+    },
+    {
+      "id": "close-1",
+      "type": "close",
+      "label": "End Chat",
+      "message": "Thank you for calling Global Finance. Goodbye."
+    }
+  ],
+  "connections": [
+    { "from": "start-1", "to": "msg-1", "type": "default" },
+    { "from": "msg-1", "to": "ask-1", "type": "default" },
+    
+    { "from": "ask-1", "to": "api-1", "type": "intent_match", "condition": "account_query" },
+    { "from": "ask-1", "to": "ai-1", "type": "intent_match", "condition": "loan_query" },
+    { "from": "ask-1", "to": "transfer-1", "type": "failover" },
+    
+    { "from": "api-1", "to": "code-1", "type": "api_success" },
+    { "from": "api-1", "to": "transfer-1", "type": "api_fail" },
+    
+    { "from": "code-1", "to": "cond-1", "type": "code_success" },
+    { "from": "code-1", "to": "transfer-1", "type": "code_fail" },
+    
+    { "from": "cond-1", "to": "msg-2", "type": "case_match", "condition": "ACTIVE" },
+    { "from": "cond-1", "to": "transfer-1", "type": "default_case" },
+    
+    { "from": "msg-2", "to": "close-1", "type": "default" },
+    
+    { "from": "ai-1", "to": "msg-3", "type": "intent_match", "condition": "personal_loan" },
+    { "from": "ai-1", "to": "msg-3", "type": "intent_match", "condition": "auto_loan" },
+    { "from": "ai-1", "to": "transfer-1", "type": "failover" },
+    
+    { "from": "msg-3", "to": "close-1", "type": "default" },
+    
+    { "from": "transfer-1", "to": "close-1", "type": "fallback_action" }
+  ]
+}
+```
+
 ---
 
 ## CHAT-ONLY BLOCKS (NOT available on your voice recipe)
